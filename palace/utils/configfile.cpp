@@ -434,6 +434,29 @@ void RefinementData::SetUp(json &model)
       maximum_imbalance >= 1,
       "config[\"Refinement\"][\"MaximumImbalance\"] must be greater than or equal to 1!");
 
+  // Options for TMOP.
+  auto tmop = refinement->find("TMOP");
+  if (tmop != refinement->end())
+  {
+    tmop_data.max_it = tmop->value("MaxIts", tmop_data.max_it);
+    tmop_data.tol = tmop->value("Tol", tmop_data.tol);
+    tmop_data.metric_id = tmop->value("Metric", tmop_data.metric_id);
+    tmop_data.target_id = tmop->value("Target", tmop_data.target_id);
+    tmop_data.amr_iter = tmop->value("AMRIter", tmop_data.amr_iter);
+    tmop_data.verbose = tmop->value("Verbose", tmop_data.verbose);
+
+    // Cleanup
+    tmop->erase("MaxIts");
+    tmop->erase("Tol");
+    tmop->erase("Metric");
+    tmop->erase("Target");
+    tmop->erase("AMRIter");
+    tmop->erase("Verbose");
+    MFEM_VERIFY(tmop->empty(),
+                "Found an unsupported configuration file keyword under \"TMOP\"!\n"
+                    << tmop->dump(2));
+  }
+
   // Options for a priori refinement.
   uniform_ref_levels = refinement->value("UniformLevels", uniform_ref_levels);
   ser_uniform_ref_levels = refinement->value("SerialUniformLevels", ser_uniform_ref_levels);
@@ -533,6 +556,7 @@ void RefinementData::SetUp(json &model)
   refinement->erase("SerialUniformLevels");
   refinement->erase("Boxes");
   refinement->erase("Spheres");
+  refinement->erase("TMOP");
   MFEM_VERIFY(refinement->empty(),
               "Found an unsupported configuration file keyword under \"Refinement\"!\n"
                   << refinement->dump(2));
@@ -551,6 +575,11 @@ void RefinementData::SetUp(json &model)
     std::cout << "SaveAdaptMesh: " << save_adapt_mesh << '\n';
     std::cout << "UniformLevels: " << uniform_ref_levels << '\n';
     std::cout << "SerialUniformLevels: " << ser_uniform_ref_levels << '\n';
+    std::cout << "TMOP.MaxIts: " << tmop_data.max_it << '\n';
+    std::cout << "TMOP.Tol: " << tmop_data.tol << '\n';
+    std::cout << "TMOP.Metric: " << tmop_data.metric_id << '\n';
+    std::cout << "TMOP.Target: " << tmop_data.target_id << '\n';
+    std::cout << "TMOP.AMRIter: " << tmop_data.amr_iter << '\n';
   }
 }
 

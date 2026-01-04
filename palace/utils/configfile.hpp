@@ -140,6 +140,27 @@ struct SphereRefinementData
   std::array<double, 3> center{{0.0, 0.0, 0.0}};
 };
 
+struct TMOPData
+{
+  // Maximum number of iterations for the nonlinear solver.
+  int max_it = 100;
+
+  // Relative tolerance for the nonlinear solver.
+  double tol = 1.0e-6;
+
+  // TMOP metric ID (e.g., 2 for ideal shape).
+  int metric_id = 2;
+
+  // Target construction ID (e.g., 1 for ideal shape, 2 for ideal shape given size).
+  int target_id = 1;
+
+  // Frequency of TMOP application relative to AMR iterations.
+  int amr_iter = 0;  // Default to disabled; set > 0 to enable
+
+  // Verbosity level.
+  int verbose = 0;
+};
+
 struct RefinementData
 {
 public:
@@ -180,6 +201,9 @@ public:
 
   // Serial uniform mesh refinement levels.
   int ser_uniform_ref_levels = 0;
+
+  // TMOP configuration.
+  TMOPData tmop_data;
 
 private:
   // Refinement data for mesh regions.

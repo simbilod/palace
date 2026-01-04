@@ -12,6 +12,7 @@
 #include "fem/errorindicator.hpp"
 #include "fem/fespace.hpp"
 #include "fem/mesh.hpp"
+#include "fem/tmoprefiner.hpp"
 #include "linalg/ksp.hpp"
 #include "models/domainpostoperator.hpp"
 #include "models/portexcitations.hpp"
@@ -158,6 +159,7 @@ void BaseSolver::SolveEstimateMarkRefine(std::vector<std::unique_ptr<Mesh>> &mes
 
   // Main AMR loop.
   int it = 0;
+  TMOPRefiner tmop_refiner(iodata);
   while (!ExhaustedResources(it, ntdof) && err >= refinement.tol)
   {
     // Print timing summary.
@@ -196,7 +198,7 @@ void BaseSolver::SolveEstimateMarkRefine(std::vector<std::unique_ptr<Mesh>> &mes
       return marked_elements;
     }(indicators);
 
-    // Refine.
+    // Refine (h-refinement).
     {
       mfem::ParMesh &fine_mesh = *mesh.back();
       const auto initial_elem_count = fine_mesh.GetGlobalNE();
@@ -223,6 +225,16 @@ void BaseSolver::SolveEstimateMarkRefine(std::vector<std::unique_ptr<Mesh>> &mes
                    ratio_pre, refinement.maximum_imbalance, ratio_post);
       }
       mesh.back()->Update();
+    }
+
+    // TMOP Refinement - run after h-refinement.
+    {
+      const auto &tmop_data = iodata.model.refinement.tmop_data;
+      if (tmop_data.amr_iter > 0 && it % tmop_data.amr_iter == 0)
+      {
+        tmop_refiner.Apply(*mesh.back(), iodata.problem.verbose);
+        mesh.back()->Update();
+      }
     }
 
     // Solve + estimate.
