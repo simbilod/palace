@@ -319,8 +319,8 @@ public:
   }
 
   // Special case of global indicator — init and print all at once.
-  void PrintErrorIndicator(bool is_root,
-                           const ErrorIndicator::SummaryStatistics &indicator_stats);
+  void PrintErrorIndicator(const fem_op_t<solver_t> &fem_op,
+                           const ErrorIndicator &indicator);
 
   // "Delayed ctor" so that PostOperator can call it once it is fully constructed.
   // Set-up all files to be called from post_op.

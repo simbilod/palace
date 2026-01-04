@@ -1207,23 +1207,76 @@ auto PostOperatorCSV<solver_t>::PrintEigPortQ()
 }
 
 template <ProblemType solver_t>
-void PostOperatorCSV<solver_t>::PrintErrorIndicator(
-    bool is_root, const ErrorIndicator::SummaryStatistics &indicator_stats)
+void PostOperatorCSV<solver_t>::PrintErrorIndicator(const fem_op_t<solver_t> &fem_op,
+                                                    const ErrorIndicator &indicator)
 {
-  if (!is_root)
+  // 1. Gather local data: center coordinates (x,y,z) and error value
+  const auto &mesh = fem_op.GetMesh();
+  const int dim = mesh.SpaceDimension();
+  const int ne = mesh.GetNE();
+  const auto &local_err = indicator.Local();
+
+  MFEM_VERIFY(local_err.Size() == ne, "Error indicator size mismatch!");
+
+  std::vector<double> local_data(ne * 4);
+  mfem::Vector center;
+  for (int i = 0; i < ne; i++)
   {
-    return;
+    const_cast<mfem::ParMesh &>(mesh.Get()).GetElementCenter(i, center);
+    local_data[4 * i + 0] = center(0);
+    local_data[4 * i + 1] = center(1);
+    local_data[4 * i + 2] = (dim == 3) ? center(2) : 0.0;
+    local_data[4 * i + 3] = local_err(i);
   }
 
-  TableWithCSVFile error_indicator(post_dir / "error-indicators.csv");
-  error_indicator.table.reserve(1, 4);
+  // 2. Gather all data to root
+  auto comm = fem_op.GetComm();
+  const int rank = Mpi::Rank(comm);
+  const int size = Mpi::Size(comm);
 
-  error_indicator.table.insert(Column("norm", "Norm") << indicator_stats.norm);
-  error_indicator.table.insert(Column("min", "Minimum") << indicator_stats.min);
-  error_indicator.table.insert(Column("max", "Maximum") << indicator_stats.max);
-  error_indicator.table.insert(Column("mean", "Mean") << indicator_stats.mean);
+  std::vector<double> global_data;
+  std::vector<int> recvcounts;
+  std::vector<int> displs;
 
-  error_indicator.WriteFullTableTrunc();
+  if (rank == 0)
+  {
+    recvcounts.resize(size);
+    displs.resize(size);
+  }
+
+  int local_count = ne * 4;
+  MPI_Gather(&local_count, 1, MPI_INT, recvcounts.data(), 1, MPI_INT, 0, comm);
+
+  if (rank == 0)
+  {
+    displs[0] = 0;
+    for (int i = 1; i < size; i++)
+    {
+      displs[i] = displs[i - 1] + recvcounts[i - 1];
+    }
+    int total_size = displs.back() + recvcounts.back();
+    global_data.resize(total_size);
+  }
+
+  MPI_Gatherv(local_data.data(), local_count, MPI_DOUBLE, global_data.data(),
+              recvcounts.data(), displs.data(), MPI_DOUBLE, 0, comm);
+
+  // 3. Write to CSV on root
+  if (rank == 0)
+  {
+    std::ofstream file(post_dir / "error-indicators.csv");
+    if (file.is_open())
+    {
+      file << "x,y,z,error\n";
+      int global_ne = global_data.size() / 4;
+      for (int i = 0; i < global_ne; i++)
+      {
+        file << fmt::format("{:.6e},{:.6e},{:.6e},{:.6e}\n", global_data[4 * i + 0],
+                            global_data[4 * i + 1], global_data[4 * i + 2],
+                            global_data[4 * i + 3]);
+      }
+    }
+  }
 }
 
 template <ProblemType solver_t>

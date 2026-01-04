@@ -1354,7 +1354,7 @@ void PostOperator<solver_t>::MeasureFinalize(const ErrorIndicator &indicator)
 {
   BlockTimer bt0(Timer::POSTPRO);
   auto indicator_stats = indicator.GetSummaryStatistics(fem_op->GetComm());
-  post_op_csv.PrintErrorIndicator(Mpi::Root(fem_op->GetComm()), indicator_stats);
+  post_op_csv.PrintErrorIndicator(*fem_op, indicator);
   if (ShouldWriteParaviewFields())
   {
     WriteParaviewFieldsFinal(&indicator);
